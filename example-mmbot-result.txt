@@ -1,0 +1,37 @@
+filemodified                                          Tue May  9 10:23:15 2017
+filename                                                          file_038.doc
+filesize                                                                 69632
+md5                                           6900368dff357ac064044011e1c512d1
+extracted_vba                Attribute VB_Name = "ThisDocument"\r\nAttribut...
+filename_vba                 ThisDocument.cls, SamboF.frm, Module3.bas, Mod...
+stream_path                  Macros/VBA/ThisDocument, Macros/VBA/SamboF, Ma...
+feat_1_cnt                                                                  95
+feat_1_importance                                                     0.243083
+feat_1_name                                                                 As
+feat_2_cnt                                                                  37
+feat_2_importance                                                     0.172548
+feat_2_name                                                                And
+feat_3_cnt                                                                  52
+feat_3_importance                                                     0.139376
+feat_3_name                                                             String
+feat_4_cnt                                                                  49
+feat_4_importance                                                     0.127028
+feat_4_name                                                                 If
+feat_5_cnt                                                                   8
+feat_5_importance                                                     0.115295
+feat_5_name                                                             Choose
+featureprint                                           As_And_String_If_Choose
+function_names               XML, GetExtInst_ED, RellenaABlancos, GetForegr...
+prediction                                                              benign
+result_dictionary            {u'vba_mean_loc_per_func': 28.24, u'vba_cnt_co...
+vba_avg_param_per_func                                                    2.45
+vba_cnt_comment_loc_ratio                                                    0
+vba_cnt_comments                                                             0
+vba_cnt_func_loc_ratio                                               0.0337268
+vba_cnt_functions                                                           21
+vba_cnt_loc                                                                593
+vba_entropy_chars                                                      4.98553
+vba_entropy_func_names                                                 3.43706
+vba_entropy_words                                                      3.65523
+vba_mean_loc_per_func                                                  28.2381
+Name: 0, dtype: object
