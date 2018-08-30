@@ -43,7 +43,7 @@ It uses the following libraries:
 2. Install Python requirements
 
  ```session
- $ sudo pip install tinyscript mmbot pandas markdown2 weasyprint
+ $ sudo pip install -r requirements.txt
  ```
 
  > **Behind a proxy ?**
