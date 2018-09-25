@@ -121,10 +121,10 @@ class MacroSampleTester(object):
             os.makedirs(mf)
         benign, c_all, c_vba = [], [0] * 4, [0] * 4
         if self.vt.is_enabled:
-            r = "{: <16}{: <16}{}\n".format("FILE", "PREDICTION",
+            r = "{: <16}  {: <16}  {}\n".format("FILE", "PREDICTION",
                                             "VT DETECTION")
         else:
-            r = "{: <16}{}\n".format("FILE", "PREDICTION")
+            r = "{: <16}  {}\n".format("FILE", "PREDICTION")
         for k, v in sorted(self.results.items()):
             if filter_func is not None and not filter_func(k):
                 continue
@@ -147,9 +147,9 @@ class MacroSampleTester(object):
             # add stats line to report if it has a valid macro
             if not failed:
                 if self.vt.is_enabled:
-                    r += "{: <16}{: <16}{}\n".format(k, pred, drate)
+                    r += "{: <16}  {: <16}  {}\n".format(k, pred, drate)
                 else:
-                    r += "{: <16}{}\n".format(k, pred)
+                    r += "{: <16}  {}\n".format(k, pred)
             # perform counts
             if malicious:
                 c_all[0] += 1
