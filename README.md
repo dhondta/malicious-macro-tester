@@ -63,47 +63,46 @@ It uses the following libraries:
 1. Help
 
  ```session
- $ ./malicious-macro-tester.py -h
- 
- usage: malicious-macro-tester.py [-h] [--api-key VT_KEY]
-                                  [--output {html,md,pdf}] [-d] [-f] [-l] [-q]
-                                  [-r] [-s] [-u] [-v]
-                                  FOLDER
- 
- MaliciousMacroTester v2.0
- Author: Alexandre D'Hondt
- Reference: INFOM444 - Machine Learning - Hot Topic
- 
- This tool uses MaliciousMacroBot to classify a list of samples as benign or
-  malicious and provides a report. Note that it only works on an input folder
-  and list every file to run it against mmbot.
- 
- positional arguments:
-   FOLDER                folder with the samples to be tested OR
-                         pickle name if results are loaded with -l
- 
- optional arguments:
-   -h, --help            show this help message and exit
-   --api-key VT_KEY      VirusTotal API key (default: none)
-                           NB: key as a string or file path to the key
-   --output {html,md,pdf}
-                         report file format [html|md|pdf] (default: none)
-   -d                    dump complete results (default: false)
-   -f                    filter only DOC and XLS files (default: false)
-   -l                    load previous pickled results (default: false)
-   -q                    do not display results report (default: false)
-   -r                    when loading pickle, retry VirusTotal hashes with None results
-                          (default: false)
-   -s                    pickle results to a file (default: false)
-   -u                    when loading pickle, update VirusTotal results (default: false)
-   -v                    debug verbose level (default: false)
- 
- Usage examples:
-   python malicious-macro-tester.py my_samples_folder
-   python malicious-macro-tester.py samples --api-key virustotal-key.txt -lr
-   python malicious-macro-tester.py samples -lsrv --api-key 098fa24...be724a0
-   python malicious-macro-tester.py samples -lf --output pdf
- 
+  $ python malicious-macro-tester.py -h
+  usage: malicious-macro-tester [-h] [--api-key VT_KEY]
+                                [--output {html,json,md,pdf}] [-d] [-f] [-l]
+                                [-q] [-r] [-s] [-u] [-v]
+                                FOLDER
+
+  MaliciousMacroTester v2.2
+  Author: Alexandre D'Hondt
+  Reference: INFOM444 - Machine Learning - Hot Topic
+
+  This tool uses MaliciousMacroBot to classify a list of samples as benign or
+   malicious and provides a report. Note that it only works on an input folder
+   and list every file to run it against mmbot.
+
+  positional arguments:
+    FOLDER                folder with the samples to be tested OR
+                          pickle name if results are loaded with -l
+
+  optional arguments:
+    -h, --help            show this help message and exit
+    --api-key VT_KEY      VirusTotal API key (default: none)
+                            NB: key as a string or file path to the key
+    --output {html,json,md,pdf}
+                          report file format [html|json|md|pdf] (default: none)
+    -d                    dump complete results (default: false)
+    -f                    filter only DOC and XLS files (default: false)
+    -l                    load previous pickled results (default: false)
+    -q                    do not display results report (default: false)
+    -r                    when loading pickle, retry VirusTotal hashes with None results
+                           (default: false)
+    -s                    pickle results to a file (default: false)
+    -u                    when loading pickle, update VirusTotal results (default: false)
+    -v                    debug verbose level (default: false)
+
+  Usage examples:
+    python malicious-macro-tester.py my_samples_folder
+    python malicious-macro-tester.py samples --api-key virustotal-key.txt -lr
+    python malicious-macro-tester.py samples -lsrv --api-key 098fa24...be724a0
+    python malicious-macro-tester.py samples -lf --output pdf
+   
  ```
  
 2. Example of output

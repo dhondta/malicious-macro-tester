@@ -463,7 +463,8 @@ if __name__ == '__main__':
                         help="VirusTotal API key (default: none)\n  NB: "
                              "key as a string or file path to the key")
     parser.add_argument("--output", choices=OUTPUT_FORMATS, default=None,
-                        help="report file format [html|md|pdf] (default: none)")
+                        help="report file format [{}] (default: none)"
+                             .format('|'.join(OUTPUT_FORMATS)))
     parser.add_argument("-d", dest="dump", action="store_true",
                         help="dump complete results (default: false)")
     parser.add_argument("-f", dest="filter", action="store_true",
