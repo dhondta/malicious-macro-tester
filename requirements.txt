@@ -3,3 +3,4 @@ mmbot
 pandas
 tinyscript
 weasyprint
+coloredlogs
