@@ -2,7 +2,7 @@
 # -*- coding: UTF-8 -*-
 
 __author__ = "Alexandre D'Hondt"
-__version__ = "2.0"
+__version__ = "2.2"
 __copyright__ = "AGPLv3 (http://www.gnu.org/licenses/agpl.html)"
 __reference__ = "INFOM444 - Machine Learning - Hot Topic"
 __doc__ = """
@@ -20,8 +20,10 @@ if sys.version_info[0] > 2:
     print("Sorry, this script only works with Python 2...")
     sys.exit(0)
 # -------------------- IMPORTS SECTION --------------------
+import json
 import pickle
 import urllib2
+from os.path import abspath, join
 from pandas.core.series import Series
 from tinyscript import *
 # non-standard imports with warning if dependencies are missing
@@ -61,6 +63,7 @@ PDF_CSS = "h1,h3{line-height:1}address,blockquote,dfn,em{font-style:italic}ht" \
           "olor:#fff}.first{margin-left:0;padding-left:0}.last{margin-right:0" \
           ";padding-right:0}.top{margin-top:0;padding-top:0}.bottom{margin-bo" \
           "ttom:0;padding-bottom:0}"
+OUTPUT_FORMATS = ["html", "json", "md", "pdf"]
 
 
 # -------------------- CLASSES SECTION --------------------
@@ -78,9 +81,11 @@ class MacroSampleTester(object):
     def __init__(self, folder, load=False, save=False, display=False, key=None):
         self.__display = display
         self.__save = save
+        logger.debug("Instantiating and initializing MaliciousMacroBot...")
         self.bot = MaliciousMacroBot()
         self.bot.mmb_init_model()
         self.folder = folder
+        logger.warn("Macros will be saved to: {}".format(join(folder, 'vba')))
         self.report = None
         self.results = None
         if load:
@@ -111,8 +116,8 @@ class MacroSampleTester(object):
             return
         assert hasattr(filter_func, '__call__') or filter_func is None
         logger.info("Parsing results...")
-        vba = os.path.abspath(os.path.join(self.folder, 'vba'))
-        bf, mf = os.path.join(vba, 'benign'), os.path.join(vba, 'malicious')
+        vba = abspath(join(self.folder, 'vba'))
+        bf, mf = join(vba, 'benign'), join(vba, 'malicious')
         if not os.path.isdir(vba):
             os.makedirs(vba)
         if not os.path.isdir(bf):
@@ -125,31 +130,33 @@ class MacroSampleTester(object):
                                             "VT DETECTION")
         else:
             r = "{: <16}  {}\n".format("FILE", "PREDICTION")
+        j = {'results': []}
         for k, v in sorted(self.results.items()):
+            # filter according to the input lambda function 'filter_func'
             if filter_func is not None and not filter_func(k):
                 continue
             # define shortnames
-            drate = v.get("vt_detection_rate")
-            macro = v["extracted_vba"]
+            drate = v.get('vt_detection_rate')
+            macro = v['extracted_vba']
             failed = macro.startswith("Error:'utf8'") \
                   or macro.startswith("Error:Failed") \
                   or macro == "No VBA Macros found"
-            pred = v["prediction"]
+            pred = v['prediction']
             malicious = pred == "malicious"
-            v["extraction_failed"] = failed
+            i = {'file': k, 'prediction': pred}
             # save the VBA code to the samples folder in subfolder 'vba'
-            n, _ = os.path.splitext(k)
             if not failed:
                 dest = [bf, mf][malicious]
-                vba_fn = os.path.join(dest, "{}-macro.vba".format(n))
+                vba_fn = join(dest, "{}.vba".format(k))
                 with open(vba_fn, 'w') as f:
                     f.write(macro)
-            # add stats line to report if it has a valid macro
-            if not failed:
+                # add stats line to report if it has a valid macro
                 if self.vt.is_enabled:
+                    i['vt_detection'] = drate
                     r += "{: <16}  {: <16}  {}\n".format(k, pred, drate)
                 else:
                     r += "{: <16}  {}\n".format(k, pred)
+            j['results'].append(i)
             # perform counts
             if malicious:
                 c_all[0] += 1
@@ -169,18 +176,26 @@ class MacroSampleTester(object):
                     c_vba[2] += 1
                 c_vba[-1] += 1
         # make the report
+        # - handle the whole list of files first
+        j['statistics'] = {'all': {'malicious': c_all[0], 'total': c_all[-1]}}
         r += "\nAll files:" \
              "\n  Marked as malicious:                  {: >3}/{} ({}%)" \
              .format(c_all[0], c_all[-1], 100 * c_all[0] / c_all[-1])
         if self.vt.is_enabled:
+            j['statistics']['all'].update({'vt_unknown': c_all[1],
+                                           'malicious_and_vt_known': c_all[2]})
             r += "\n  Unknown from VT:                      {: >3}/{} ({}%)" \
                  .format(c_all[1], c_all[-1], 100 * c_all[1] / c_all[-1]) + \
                  "\n  Marked as malicious and known from VT:{: >3}/{} ({}%)" \
                  .format(c_all[2], c_all[-1], 100 * c_all[2] / c_all[-1])
+        # - only handle files with a successfully extracted VBA macro
+        j['statistics']['vba'] = {'malicious': c_vba[0], 'total': c_vba[-1]}
         r += "\n\nOnly files for which the VBA macro could be extracted:" \
              "\n  Marked as malicious:                  {: >3}/{} ({}%)" \
              .format(c_vba[0], c_vba[-1], 100 * c_vba[0] / c_vba[-1])
         if self.vt.is_enabled:
+            j['statistics']['vba'].update({'vt_unknown': c_vba[1],
+                                           'malicious_and_vt_known': c_vba[2]})
             r += "\n  Unknown from VT:                      {: >3}/{} ({}%)" \
                  .format(c_vba[1], c_vba[-1], 100 * c_vba[1] / c_vba[-1]) + \
                  "\n  Marked as malicious and known from VT:{: >3}/{} ({}%)" \
@@ -189,6 +204,7 @@ class MacroSampleTester(object):
         if self.__display:
             print(r)
         self.report = r
+        self.json = j
 
     def process(self, update=False, retry=False):
         """
@@ -253,21 +269,26 @@ class Report(object):
     :param output: report output format (extension)
     :param fn: filename of the report (without extension)
     """
-    def __init__(self, data=None, title=None, output="pdf", fn="report"):
-        assert output in ["html", "md", "pdf"]
-        try:
-            import markdown2
-            self.__markdown2 = True
-        except ImportError:
-            logger.warn("(Install 'markdown2' for generating HTML/PDF reports)")
-            self.__markdown2 = False
-        try:
-            from weasyprint import HTML
-            self.__weasyprint = True
-        except ImportError:
-            logger.warn("(Install 'weasyprint' for generating PDF reports)")
-            self.__weasyprint = False
-        self.data = data
+    def __init__(self, tester, title=None, output="pdf", fn="report"):
+        assert isinstance(tester, MacroSampleTester)
+        assert output in OUTPUT_FORMATS
+        self.data = tester.report
+        self.json = tester.json
+        if output in ["html", "pdf"]:
+            try:
+                import markdown2
+                self.__markdown2 = True
+            except ImportError:
+                logger.warn("(Install 'markdown2' for generating HTML/PDF"
+                            " reports)")
+                self.__markdown2 = False
+        if output == "pdf":
+            try:
+                from weasyprint import HTML
+                self.__weasyprint = True
+            except ImportError:
+                logger.warn("(Install 'weasyprint' for generating PDF reports)")
+                self.__weasyprint = False
         self.file = "{}.{}".format(fn, output)
         self.title = title
         if fn is not None:
@@ -291,6 +312,21 @@ class Report(object):
                 f.write(html)
         else:
             return html
+    
+    def __json(self, text=False):
+        """
+        Generate a JSON object from the report data.
+        
+        :param text: return as text anyway
+        :return: None if filename is not None, JSON report in text otherwise
+        """
+        js = {'title': self.title}
+        js.update(self.json)
+        if self.file is not None and not text:
+            with open(self.file, 'w') as f:
+                json.dump(js, f, indent=4)
+        else:
+            return js
 
     def __md(self, text=False):
         """
@@ -426,7 +462,7 @@ if __name__ == '__main__':
     parser.add_argument("--api-key", dest="vt_key", default=None,
                         help="VirusTotal API key (default: none)\n  NB: "
                              "key as a string or file path to the key")
-    parser.add_argument("--output", choices=["html", "md", "pdf"], default=None,
+    parser.add_argument("--output", choices=OUTPUT_FORMATS, default=None,
                         help="report file format [html|md|pdf] (default: none)")
     parser.add_argument("-d", dest="dump", action="store_true",
                         help="dump complete results (default: false)")
@@ -459,4 +495,4 @@ if __name__ == '__main__':
     tester.parse((lambda x: any([x.endswith(e) for e \
                             in ['.doc', '.xls']])) if args.filter else None)
     if args.output is not None:
-        Report(tester.report, "Malicious Macro Detection Report", args.output)
+        Report(tester, "Malicious Macro Detection Report", args.output)
