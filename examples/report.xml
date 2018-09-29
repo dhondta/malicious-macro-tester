@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<report>
+	<title>Malicious Macro Detection Report</title>
+	<statistics>
+		<all>
+			<total>6</total>
+			<malicious>4</malicious>
+		</all>
+		<vba>
+			<total>5</total>
+			<malicious>4</malicious>
+		</vba>
+	</statistics>
+	<results>
+		<result>
+			<prediction>malicious</prediction>
+			<file>file_000.doc</file>
+		</result>
+		<result>
+			<prediction>benign</prediction>
+			<file>file_001.doc</file>
+		</result>
+		<result>
+			<prediction>malicious</prediction>
+			<file>file_002.doc</file>
+		</result>
+		<result>
+			<prediction>malicious</prediction>
+			<file>file_003.xls</file>
+		</result>
+		<result>
+			<prediction>malicious</prediction>
+			<file>file_004.xls</file>
+		</result>
+		<result>
+			<prediction>benign</prediction>
+			<file>file_005.xls</file>
+		</result>
+	</results>
+</report>

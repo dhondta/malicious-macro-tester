@@ -1,0 +1,48 @@
+{
+    "statistics": {
+        "all": {
+            "total": 6, 
+            "malicious": 4, 
+            "vt_unknown": 1, 
+            "malicious_and_vt_known": 4
+        }, 
+        "vba": {
+            "total": 5, 
+            "malicious": 4, 
+            "vt_unknown": 0, 
+            "malicious_and_vt_known": 4
+        }
+    }, 
+    "results": [
+        {
+            "vt_detection": "37/56", 
+            "prediction": "malicious", 
+            "file": "file_000.doc"
+        }, 
+        {
+            "prediction": "benign", 
+            "file": "file_001.doc"
+        }, 
+        {
+            "vt_detection": "37/57", 
+            "prediction": "malicious", 
+            "file": "file_002.doc"
+        }, 
+        {
+            "vt_detection": "36/56", 
+            "prediction": "malicious", 
+            "file": "file_003.xls"
+        }, 
+        {
+            "vt_detection": "40/61", 
+            "prediction": "malicious", 
+            "file": "file_004.xls"
+        }, 
+        {
+            "vt_detection": "42/60", 
+            "prediction": "benign", 
+            "file": "file_005.xls"
+        }
+    ], 
+    "title": "Malicious Macro Detection Report"
+}

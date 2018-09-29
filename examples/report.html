@@ -1,0 +1,64 @@
+<h1>Malicious Macro Detection Report</h1>
+
+<table>
+<thead>
+<tr>
+  <th align="center"><strong>FILE</strong></th>
+  <th align="center"><strong>PREDICTION</strong></th>
+  <th align="center"><strong>VT DETECTION</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td align="center">file_000.doc</td>
+  <td align="center">malicious</td>
+  <td align="center">37/56</td>
+</tr>
+<tr>
+  <td align="center">file_002.doc</td>
+  <td align="center">malicious</td>
+  <td align="center">37/57</td>
+</tr>
+<tr>
+  <td align="center">file_003.xls</td>
+  <td align="center">malicious</td>
+  <td align="center">36/56</td>
+</tr>
+<tr>
+  <td align="center">file_004.xls</td>
+  <td align="center">malicious</td>
+  <td align="center">40/61</td>
+</tr>
+<tr>
+  <td align="center">file_005.xls</td>
+  <td align="center">benign</td>
+  <td align="center">42/60</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>All files</strong>:</p>
+
+<blockquote>
+  <p>Marked as malicious:                    4/6 (66%)</p>
+  
+  <p>Unknown from VT:                        1/6 (16%)</p>
+  
+  <p>Marked as malicious and known from VT:  4/6 (66%)</p>
+</blockquote>
+
+<p><strong>Only files for which the VBA macro could be extracted</strong>:</p>
+
+<blockquote>
+  <p>Marked as malicious:                    4/5 (80%)</p>
+  
+  <p>Unknown from VT:                        0/5 (0%)</p>
+  
+  <p>Marked as malicious and known from VT:  4/5 (80%)</p>
+</blockquote>
+
+<p><strong>Benign files</strong>:</p>
+
+<blockquote>
+  <p>file<em>001.doc, file</em>005.xls</p>
+</blockquote>
