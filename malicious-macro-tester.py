@@ -21,17 +21,16 @@ if sys.version_info[0] > 2:
     sys.exit(0)
 # -------------------- IMPORTS SECTION --------------------
 import json
+import markdown2
 import pickle
 import urllib2
+import xmltodict
+from collections import OrderedDict
+from mmbot import MaliciousMacroBot
 from os.path import abspath, join
 from pandas.core.series import Series
 from tinyscript import *
-# non-standard imports with warning if dependencies are missing
-try:
-    from mmbot import MaliciousMacroBot
-except ImportError:
-    print("Please install mmbot via 'pip install mmbot' first.")
-    sys.exit(1)
+from weasyprint import HTML
 
 
 # -------------------- CONSTANTS SECTION --------------------
@@ -63,7 +62,7 @@ PDF_CSS = "h1,h3{line-height:1}address,blockquote,dfn,em{font-style:italic}ht" \
           "olor:#fff}.first{margin-left:0;padding-left:0}.last{margin-right:0" \
           ";padding-right:0}.top{margin-top:0;padding-top:0}.bottom{margin-bo" \
           "ttom:0;padding-bottom:0}"
-OUTPUT_FORMATS = ["html", "json", "md", "pdf"]
+OUTPUT_FORMATS = ["html", "json", "md", "pdf", "xml"]
 
 
 # -------------------- CLASSES SECTION --------------------
@@ -110,10 +109,7 @@ class MacroSampleTester(object):
 
         :param filter_func: function for filtering files
         """
-        if not (isinstance(self.results, dict) and all(isinstance(x, Series)
-                for x in self.results.values())):
-            logger.error("Corrupted results, cannot parse.")
-            return
+        assert isinstance(self.results, dict)
         assert hasattr(filter_func, '__call__') or filter_func is None
         logger.info("Parsing results...")
         vba = abspath(join(self.folder, 'vba'))
@@ -213,8 +209,7 @@ class MacroSampleTester(object):
         :param update: force updating VirusTotal result
         :param retry: retry VirusTotal request if previous result was None
         """
-        assert (isinstance(self.results, dict) and all(isinstance(x, Series)
-               for x in self.results.values())) or self.results is None
+        assert isinstance(self.results, dict) or self.results is None
         logger.info("Processing samples...")
         # first, get the results of mmbot
         if self.results is None:
@@ -224,9 +219,11 @@ class MacroSampleTester(object):
                 if os.path.isfile(fp):
                     logger.debug("MMBot: classifying '{}'...".format(fn))
                     try:
-                        self.results[fn] = self.bot.mmb_predict(fp,
-                                           datatype='filepath').iloc[0]
-                        del self.results[fn]['filepath']
+                        r = self.bot.mmb_predict(fp, datatype='filepath') \
+                            .iloc[0]
+                        r = {k: v for k, v in r.iteritems() \
+                             if k != 'result_dictionary'}
+                        self.results[fn] = r
                     except (TypeError, ValueError):
                         logger.error("Failed to classify '{}'".format(fn))
                         self.results[fn] = None
@@ -238,11 +235,14 @@ class MacroSampleTester(object):
                 check = False
                 f = "vt_detection_rate"
                 if f not in v:
-                    check = not logger.debug("> Getting VT information...")
+                    check = not logger.debug("> Getting VT information ({})..."
+                                             .format(k))
                 elif update:
-                    check = not logger.debug("> Updating VT information...")
+                    check = not logger.debug("> Updating VT information ({})..."
+                                             .format(k))
                 elif v.get(f) is None and retry:
-                    check = not logger.debug("> Retrying VT information...")
+                    check = not logger.debug("> Retrying VT information ({})..."
+                                             .format(k))
                 if check:
                     v["vt_detection_rate"] = self.vt.check(v['md5'])
         else:
@@ -274,21 +274,6 @@ class Report(object):
         assert output in OUTPUT_FORMATS
         self.data = tester.report
         self.json = tester.json
-        if output in ["html", "pdf"]:
-            try:
-                import markdown2
-                self.__markdown2 = True
-            except ImportError:
-                logger.warn("(Install 'markdown2' for generating HTML/PDF"
-                            " reports)")
-                self.__markdown2 = False
-        if output == "pdf":
-            try:
-                from weasyprint import HTML
-                self.__weasyprint = True
-            except ImportError:
-                logger.warn("(Install 'weasyprint' for generating PDF reports)")
-                self.__weasyprint = False
         self.file = "{}.{}".format(fn, output)
         self.title = title
         if fn is not None:
@@ -301,9 +286,7 @@ class Report(object):
         :param text: return as text anyway
         :return: None if filename is not None, HTML report in text otherwise
         """
-        if not self.__markdown2:
-            return
-        import markdown2
+        
         html = markdown2.markdown(self.__md(True), extras=["tables"])
         logger.debug("Generating the HTML report{}..."
                      .format(["", " (text only)"][text]))
@@ -320,6 +303,8 @@ class Report(object):
         :param text: return as text anyway
         :return: None if filename is not None, JSON report in text otherwise
         """
+        logger.debug("Generating the JSON report{}..."
+                     .format(["", " (text only)"][text]))
         js = {'title': self.title}
         js.update(self.json)
         if self.file is not None and not text:
@@ -382,8 +367,11 @@ class Report(object):
     def __pdf(self):
         """
         Generate a PDF file from the report data.
+
+        :param text: return as text anyway
+        :return: None if filename is not None, XML report in text otherwise
         """
-        if self.file is None or not self.__markdown2 or not self.__weasyprint:
+        if self.file is None:
             return
         tmp_css = "/tmp/{}-style.css".format(__file__.replace("./", ""))
         with open(tmp_css, 'w') as f:
@@ -393,6 +381,26 @@ class Report(object):
         logger.debug("Generating the PDF report...")
         html.write_pdf(self.file, stylesheets=[tmp_css])
         os.remove(tmp_css)
+    
+    def __xml(self, text=False):
+        """
+        Generate an XML output from the report data.
+        """
+        _ = self.__json(True)
+        stats = OrderedDict()
+        js = OrderedDict([
+            ('title', self.title),
+            ('statistics', _['statistics']),
+            ('results', {'result': _['results']})
+        ])
+        logger.debug("Generating the XML report{}..."
+                     .format(["", " (text only)"][text]))
+        xml = xmltodict.unparse({'report': js}, pretty=True)
+        if self.file is not None and not text:
+            with open(self.file, 'w') as f:
+                f.write(xml)
+        else:
+            return xml
 
 
 class VirusTotalClient(object):
