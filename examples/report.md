@@ -1,13 +1,14 @@
 # Malicious Macro Detection Report
 
 
-|   **FILE**   | **PREDICTION** |
-|:------------:|:--------------:|
-| file_000.doc |   malicious    |
-| file_002.doc |   malicious    |
-| file_003.xls |   malicious    |
-| file_004.xls |   malicious    |
-| file_005.xls |     benign     |
+|   **FILENAME**   | **PREDICTION** |
+|:----------------:|:--------------:|
+|  `file_000.doc`  |   malicious    |
+|  `file_001.xls`  |     benign     |
+|  `file_002.doc`  |   malicious    |
+|  `file_003.xls`  |   malicious    |
+|  `file_004.xls`  |   malicious    |
+|  `file_005.xls`  |     benign     |
 
 
 **All files**:
@@ -24,5 +25,5 @@
 
 **Benign files**:
 
-> file_001.doc, file_005.xls
+> `file_001.doc`, `file_005.xls`
 > 

@@ -2,7 +2,7 @@
 # -*- coding: UTF-8 -*-
 
 __author__ = "Alexandre D'Hondt"
-__version__ = "2.2"
+__version__ = "2.3"
 __copyright__ = "AGPLv3 (http://www.gnu.org/licenses/agpl.html)"
 __reference__ = "INFOM444 - Machine Learning - Hot Topic"
 __doc__ = """
@@ -11,15 +11,17 @@ This tool uses MaliciousMacroBot to classify a list of samples as benign or
  and list every file to run it against mmbot.
 """
 __examples__ = ["my_samples_folder",
-                "samples --api-key virustotal-key.txt -lr",
-                "samples -lsrv --api-key 098fa24...be724a0",
-                "samples -lf --output pdf"]
+                "my_samples_folder --api-key virustotal-key.txt -lr",
+                "my_samples_folder -lsrv --api-key 098fa24...be724a0",
+                "my_samples_folder -lf --output pdf",
+                "my_samples_folder --output es --sent"]
 
 import sys
 if sys.version_info[0] > 2:
     print("Sorry, this script only works with Python 2...")
     sys.exit(0)
 # -------------------- IMPORTS SECTION --------------------
+import hashlib
 import json
 import markdown2
 import pickle
@@ -27,10 +29,16 @@ import urllib2
 import xmltodict
 from collections import OrderedDict
 from mmbot import MaliciousMacroBot
-from os.path import abspath, join
+from os.path import abspath, exists, isdir, join
 from pandas.core.series import Series
+from subprocess import PIPE, Popen
 from tinyscript import *
 from weasyprint import HTML
+try:
+    from elasticsearch import Elasticsearch, helpers
+    es_enabled = True
+except ImportError:
+    es_enabled = False
 
 
 # -------------------- CONSTANTS SECTION --------------------
@@ -62,7 +70,22 @@ PDF_CSS = "h1,h3{line-height:1}address,blockquote,dfn,em{font-style:italic}ht" \
           "olor:#fff}.first{margin-left:0;padding-left:0}.last{margin-right:0" \
           ";padding-right:0}.top{margin-top:0;padding-top:0}.bottom{margin-bo" \
           "ttom:0;padding-bottom:0}"
-OUTPUT_FORMATS = ["html", "json", "md", "pdf", "xml"]
+OUTPUT_FORMATS = ["es", "html", "json", "md", "pdf", "xml"]
+HBLOCKSIZE = 65536
+
+
+# ------------------- FUNCTIONS SECTION -------------------
+def hash_file(filename, algo="sha1"):
+    try:
+        h = getattr(hashlib, algo)()
+    except AttributeError:
+        return
+    with open(filename, 'rb') as f:
+        b = f.read(HBLOCKSIZE)
+        while len(b) > 0:
+            h.update(b)
+            b = f.read(HBLOCKSIZE)
+    return h.hexdigest()
 
 
 # -------------------- CLASSES SECTION --------------------
@@ -71,65 +94,133 @@ class MacroSampleTester(object):
     This class is aimed to test multiple documents from a given folder with
      MaliciousMacroBot.
 
-    :param folder: path to the samples folder
-    :param load: load previous results before starting
-    :param save: save results after processing
-    :param display: display report in terminal after processing
-    :param key: VirusTotal API key
+    :param folder:      path to the samples folder
+    :param dump:        dump the extracted VBA macros
+    :param load:        load previous results before starting
+    :param save:        save results after processing
+    :param display:     display report in terminal after processing
+    :param filter_func: function for filtering files
+    :param api_key:     VirusTotal API key
+    :param update:      force updating VirusTotal result
+    :param retry:       retry VirusTotal request if previous result was None
     """
-    def __init__(self, folder, load=False, save=False, display=False, key=None):
+    def __init__(self, folder, dump=True, load=False, save=False, display=False,
+                 filter_func=None, api_key=None, update=False, retry=False):
+        assert hasattr(filter_func, '__call__') or filter_func is None
         self.__display = display
+        self.__dump = dump
+        self.__filter_func = filter_func
+        self.__retry = retry
         self.__save = save
-        logger.debug("Instantiating and initializing MaliciousMacroBot...")
-        self.bot = MaliciousMacroBot()
-        self.bot.mmb_init_model()
+        self.__update = update
         self.folder = folder
-        logger.warn("Macros will be saved to: {}".format(join(folder, 'vba')))
         self.report = None
         self.results = None
+        self.vt = VirusTotalClient(api_key)
         if load:
-            self.load()
-        self.vt = VirusTotalClient(key)
+            self._load()
+            if self.results is None:
+                return
+        else:
+            if not load and not isdir(folder):
+                logger.error("'{}' isn't a valid samples folder".format(folder))
+                return
+            logger.info("Initializing MaliciousMacroBot...")
+            self.bot = MaliciousMacroBot()
+            self.bot.mmb_init_model()
+        self.process()
 
-    def load(self):
+    def _load(self):
         """
         Load results from a Pickle.
         """
+        fn = self.folder + ".pickle"
         try:
-            with open(self.folder + '.pickle', 'rb') as f:
+            with open(fn, 'rb') as f:
                 logger.info("Loading previous results from pickle...")
                 self.results = pickle.load(f)
         except IOError:
-            logger.warn("Pickled results do not exist")
+            logger.error("'{}' does not exist".format(fn))
             self.results = None
 
-    def parse(self, filter_func=None):
+    def _save(self):
         """
-        Parse the results got from mmbot in order to generate a report.
+        Save results as a Pickle.
+        """
+        with open(self.folder + '.pickle', 'wb') as f:
+            logger.info("Saving results to pickle...")
+            pickle.dump(self.results, f)
 
-        :param filter_func: function for filtering files
+    def process(self):
         """
-        assert isinstance(self.results, dict)
-        assert hasattr(filter_func, '__call__') or filter_func is None
+        Test all files with mmbot in a given folder and produce a report.
+        """
+        assert isinstance(self.results, dict) or self.results is None
+        logger.info("Processing samples...")
+        # first, get the results of mmbot
+        if self.results is None:
+            self.results = {}
+            for fn in os.listdir(self.folder):
+                fp = os.path.abspath(os.path.join(self.folder, fn))
+                if os.path.isfile(fp):
+                    logger.debug("MMBot: classifying '{}'...".format(fn))
+                    try:
+                        r = self.bot.mmb_predict(fp, datatype='filepath') \
+                            .iloc[0]
+                        r = {k: v for k, v in r.iteritems() \
+                             if k != 'result_dictionary'}
+                        r['sha256'] = hash_file(fp, "sha256")
+                        self.results[fn] = r
+                    except (TypeError, ValueError):
+                        logger.error("Failed to classify '{}'".format(fn))
+                        self.results[fn] = None
+        # second, if enabled, get the result from VirusTotal
+        if self.vt.is_enabled:
+            for k, v in self.results.items():
+                check = False
+                f = "vt_detection_rate"
+                if f not in v:
+                    check = not logger.debug("> Getting VT information ({})..."
+                                             .format(k))
+                elif self.__update:
+                    check = not logger.debug("> Updating VT information ({})..."
+                                             .format(k))
+                elif v.get(f) is None and self.__retry:
+                    check = not logger.debug("> Retrying VT information ({})..."
+                                             .format(k))
+                if check:
+                    v["vt_detection_rate"] = self.vt.check(v['sha256'])
+        # if flag '__save' was set, pickle results to a file
+        if self.__save:
+            self._save()
+        # prepare folders for extracting the macros
+        if self.__dump:
+            vba = join(self.folder, 'vba')
+            logger.warn("Macros will be saved to: {}".format(vba))
+            vba = abspath(vba)
+            bf, mf = join(vba, 'benign'), join(vba, 'malicious')
+            if not os.path.isdir(vba):
+                os.makedirs(vba)
+            if not os.path.isdir(bf):
+                os.makedirs(bf)
+            if not os.path.isdir(mf):
+                os.makedirs(mf)
+        # parse the results
         logger.info("Parsing results...")
-        vba = abspath(join(self.folder, 'vba'))
-        bf, mf = join(vba, 'benign'), join(vba, 'malicious')
-        if not os.path.isdir(vba):
-            os.makedirs(vba)
-        if not os.path.isdir(bf):
-            os.makedirs(bf)
-        if not os.path.isdir(mf):
-            os.makedirs(mf)
         benign, c_all, c_vba = [], [0] * 4, [0] * 4
         if self.vt.is_enabled:
             r = "{: <16}  {: <16}  {}\n".format("FILE", "PREDICTION",
                                             "VT DETECTION")
         else:
             r = "{: <16}  {}\n".format("FILE", "PREDICTION")
-        j = {'results': []}
+        j = OrderedDict([
+            ('title', "Malicious Macro Detection Report"),
+            ('statistics', None),
+            ('results', []),
+        ])
         for k, v in sorted(self.results.items()):
             # filter according to the input lambda function 'filter_func'
-            if filter_func is not None and not filter_func(k):
+            if self.__filter_func is not None and not self.__filter_func(k):
                 continue
             # define shortnames
             drate = v.get('vt_detection_rate')
@@ -139,19 +230,20 @@ class MacroSampleTester(object):
                   or macro == "No VBA Macros found"
             pred = v['prediction']
             malicious = pred == "malicious"
-            i = {'file': k, 'prediction': pred}
+            i = {'file': k, 'prediction': pred, 'sha256': v['sha256']}
             # save the VBA code to the samples folder in subfolder 'vba'
             if not failed:
-                dest = [bf, mf][malicious]
-                vba_fn = join(dest, "{}.vba".format(k))
-                with open(vba_fn, 'w') as f:
-                    f.write(macro)
-                # add stats line to report if it has a valid macro
-                if self.vt.is_enabled:
-                    i['vt_detection'] = drate
-                    r += "{: <16}  {: <16}  {}\n".format(k, pred, drate)
-                else:
-                    r += "{: <16}  {}\n".format(k, pred)
+                if self.__dump:
+                    dest = [bf, mf][malicious]
+                    vba_fn = join(dest, "{}.vba".format(k))
+                    with open(vba_fn, 'w') as f:
+                        f.write(macro)
+            # add stats line to report if it has a valid macro
+            if self.vt.is_enabled:
+                i['vt_detection'] = drate
+                r += "{: <16}  {: <16}  {}\n".format(k, pred, drate)
+            else:
+                r += "{: <16}  {}\n".format(k, pred)
             j['results'].append(i)
             # perform counts
             if malicious:
@@ -201,90 +293,59 @@ class MacroSampleTester(object):
             print(r)
         self.report = r
         self.json = j
-
-    def process(self, update=False, retry=False):
-        """
-        Test all files with mmbot in a given folder.
-
-        :param update: force updating VirusTotal result
-        :param retry: retry VirusTotal request if previous result was None
-        """
-        assert isinstance(self.results, dict) or self.results is None
-        logger.info("Processing samples...")
-        # first, get the results of mmbot
-        if self.results is None:
-            self.results = {}
-            for fn in os.listdir(self.folder):
-                fp = os.path.abspath(os.path.join(self.folder, fn))
-                if os.path.isfile(fp):
-                    logger.debug("MMBot: classifying '{}'...".format(fn))
-                    try:
-                        r = self.bot.mmb_predict(fp, datatype='filepath') \
-                            .iloc[0]
-                        r = {k: v for k, v in r.iteritems() \
-                             if k != 'result_dictionary'}
-                        self.results[fn] = r
-                    except (TypeError, ValueError):
-                        logger.error("Failed to classify '{}'".format(fn))
-                        self.results[fn] = None
-        else:
-            logger.debug("Got results from loaded Pickle")
-        # second, if enabled, get the result from VirusTotal
-        if self.vt.is_enabled:
-            for k, v in self.results.items():
-                check = False
-                f = "vt_detection_rate"
-                if f not in v:
-                    check = not logger.debug("> Getting VT information ({})..."
-                                             .format(k))
-                elif update:
-                    check = not logger.debug("> Updating VT information ({})..."
-                                             .format(k))
-                elif v.get(f) is None and retry:
-                    check = not logger.debug("> Retrying VT information ({})..."
-                                             .format(k))
-                if check:
-                    v["vt_detection_rate"] = self.vt.check(v['md5'])
-        else:
-            logger.debug("VT check is disabled")
-        # finally, if flag 'save' was set, pickle results to a file
-        if self.__save:
-            self.save()
-
-    def save(self):
-        """
-        Save results as a Pickle.
-        """
-        with open(self.folder + '.pickle', 'wb') as f:
-            logger.info("Saving results to pickle...")
-            pickle.dump(self.results, f)
-
+        
 
 class Report(object):
     """
     This class represents a results report.
 
-    :param data: results to be presented in the report
-    :param title: title for the report
+    :param data:   results to be presented in the report
+    :param title:  title for the report
     :param output: report output format (extension)
-    :param fn: filename of the report (without extension)
+    :param fn:     filename of the report (without extension)
     """
     def __init__(self, tester, title=None, output="pdf", fn="report"):
         assert isinstance(tester, MacroSampleTester)
         assert output in OUTPUT_FORMATS
-        self.data = tester.report
-        self.json = tester.json
+        try:
+            self.data = tester.report
+            self.json = tester.json
+        except AttributeError:
+            return
         self.file = "{}.{}".format(fn, output)
         self.title = title
         if fn is not None:
             getattr(self, "_Report__{}".format(output))()
+    
+    def __es(self, text=False):
+        """
+        Generate a JSON formatted for ElasticSearch.
+        
+        :param text: return as text anyway
+        :return:     None if filename is not None, HTML report in text otherwise
+        """
+        if not es_enabled:
+            return
+        es = []
+        for r in self.json['results']:
+            action = {
+                '_index': "mmbot-results",
+                '_type': "file",
+                'doc': r,
+            }
+            es.append(action)
+        if self.file is not None and not text:
+            with open(self.file, 'w') as f:
+                json.dump(es, f, indent=4)
+        else:
+            return es
 
     def __html(self, text=False):
         """
         Generate an HTML file from the report data.
 
         :param text: return as text anyway
-        :return: None if filename is not None, HTML report in text otherwise
+        :return:     None if filename is not None, HTML report in text otherwise
         """
         
         html = markdown2.markdown(self.__md(True), extras=["tables"])
@@ -301,7 +362,7 @@ class Report(object):
         Generate a JSON object from the report data.
         
         :param text: return as text anyway
-        :return: None if filename is not None, JSON report in text otherwise
+        :return:     None if filename is not None, JSON report in text otherwise
         """
         logger.debug("Generating the JSON report{}..."
                      .format(["", " (text only)"][text]))
@@ -318,7 +379,8 @@ class Report(object):
         Generate a Markdown file from the report data.
 
         :param text: return as text anyway
-        :return: None if filename is not None, Markdown report in text otherwise
+        :return:     None if filename is not None, Markdown report in text
+                      otherwise
         """
         logger.debug("Generating the Markdown report{}..."
                      .format(["", " (text only)"][text]))
@@ -332,6 +394,8 @@ class Report(object):
             if i == 0:
                 v = ["**" + x + "**" for x in v]
                 max_w = [0] * len(v)
+            else:
+                v[0] = "`{}`".format(v[0])
             for j in range(len(max_w)):
                 max_w[j] = max(max_w[j], len(v[j]))
         for i, line in enumerate(self.data.split('\n')):
@@ -345,19 +409,28 @@ class Report(object):
                         " | ".join(x.center(max_w[i]) for i, x in enumerate(v)),
                         ":|:".join('-' * max_w[i] for i in range(len(max_w))))
                 else:       # rows
+                    v[0] = "`{}`".format(v[0])
                     md += "| {} |\n".format(
                         " | ".join(x.replace("None", "").center(max_w[i]) \
                             for i, x in enumerate(v)))
             else:
                 if line == "":
                     md += "\n\n"
-                    h = True
+                    h, n = True, None
                 else:
                     if h:
-                        md += "**" + line.rstrip(":") + "**:\n\n"
+                        n = line.rstrip(":")
+                        md += "**{}**:\n\n".format(n)
                         h = False
                     else:
-                        md += "> " + line + "\n" + "> \n"
+                        b = []
+                        for f in line.split(','):
+                            f = f.strip()
+                            if n == "Benign files":
+                                f = "`{}`".format(f)
+                            b.append(f)
+                            line = ", ".join(b)
+                        md += "> {}\n> \n".format(line)
         if self.file is not None and not text:
             with open(self.file, 'w') as f:
                 f.write(md)
@@ -369,7 +442,7 @@ class Report(object):
         Generate a PDF file from the report data.
 
         :param text: return as text anyway
-        :return: None if filename is not None, XML report in text otherwise
+        :return:     None if filename is not None, XML report in text otherwise
         """
         if self.file is None:
             return
@@ -403,6 +476,55 @@ class Report(object):
             return xml
 
 
+class ElasticSearchClient(object):
+    """
+    This class is a wrapper for the ElasticSearch-Loader tool ;
+     https://pypi.org/project/elasticsearch-loader/
+    It first checks if the 'elasticsearch-loader' module is installed. If so,
+     it determines the location of the config file according to this order:
+     1. ./elasticsearch.conf
+     2. /etc/elasticsearch/elasticsearch.conf
+    """
+    CFG_FILE = "elasticsearch.conf"
+    CFG_PATH = "/etc/elasticsearch"
+    LOADER   = "elasticsearch_loader"
+    
+    def __init__(self):
+        try:
+            check_output([LOADER])
+            es_present = True
+        except OSError:
+            logger.warn("'{}' module is required"
+                        .format(LOADER.replace('_', '-')))
+            es_present = False
+        self.config = None
+        if es_present:
+            for cfg in [self.CFG_FILE, join(self.CFG_PATH, self.CFG_FILE)]:
+                try:
+                    with open(cfg) as f:
+                        pass
+                    self.config = cfg
+                    break
+                except IOError:
+                    pass
+            if self.config is None:
+                logger.error("No ElasticSearch configuration file found")
+        self.is_enabled = self.config is not None
+        
+    def load(self, filename):
+        """
+        This calls elasticsearch_loader for loading the given filename into the
+         ES instance as configured in self.config.
+         
+        :param filename: JSON file to be loaded into ES
+        """
+        p = Popen([self.LOADER, "-c", self.config, "json", filename],
+                  stdout=PIPE, stderr=PIPE)
+        out, err = p.communicate()
+        if len(err) > 0:
+            logger.error(err)
+
+
 class VirusTotalClient(object):
     """
     This class is a kind of wrapper for the VirusTotal class. It checks if the
@@ -432,7 +554,6 @@ class VirusTotalClient(object):
                     self.__vt.get(VirusTotalClient.TEST)
                 except urllib2.HTTPError:
                     logger.warn("Invalid API key ; VirusTotal check disabled")
-                    self.__vt = None
                 except VirusTotal.ApiError:
                     logger.warn("API error ; VirusTotal check disabled")
         self.is_enabled = self.__vt is not None
@@ -467,14 +588,8 @@ if __name__ == '__main__':
     parser.add_argument("samples", metavar="FOLDER",
                         help="folder with the samples to be tested OR\n"
                              "pickle name if results are loaded with -l")
-    parser.add_argument("--api-key", dest="vt_key", default=None,
-                        help="VirusTotal API key (default: none)\n  NB: "
-                             "key as a string or file path to the key")
-    parser.add_argument("--output", choices=OUTPUT_FORMATS, default=None,
-                        help="report file format [{}] (default: none)"
-                             .format('|'.join(OUTPUT_FORMATS)))
     parser.add_argument("-d", dest="dump", action="store_true",
-                        help="dump complete results (default: false)")
+                        help="dump the VBA macros (default: false)")
     parser.add_argument("-f", dest="filter", action="store_true",
                         help="filter only DOC and XLS files (default: false)")
     parser.add_argument("-l", dest="load", action="store_true",
@@ -489,19 +604,25 @@ if __name__ == '__main__':
     parser.add_argument("-u", dest="update", action="store_true",
                         help="when loading pickle, update VirusTotal results"
                              " (default: false)")
+    parser.add_argument("--api-key", dest="vt_key", default=None,
+                        help="VirusTotal API key (default: none)\n  NB: "
+                             "key as a string or file path to the key")
+    parser.add_argument("--output", choices=OUTPUT_FORMATS, default=None,
+                        help="report file format (default: none)")
+    parser.add_argument("--send", action="store_true",
+                        help="send the data to ElasticSearch (default: false)\n"
+                             "  NB: only applies to 'es' format\n     the "
+                             "configuration is loaded with the following "
+                             "precedence:\n     1. ./elasticsearch.conf\n     "
+                             "2. /etc/elasticsearch/elasticsearch.conf")
     initialize(globals())
-    validate(globals(),
-        ('samples', "not os.path.isdir( ? )",
-         "Please enter a valid samples folder"),
-    )
     # running the main stuff
-    tester = MacroSampleTester(args.samples, args.load, args.save,
-                               not args.quiet, args.vt_key)
-    tester.process(args.update, args.retry)
-    if args.dump:
-        for k in sorted(tester.results.keys()):
-            print(repr(tester.results[k]) + '\n\n')
-    tester.parse((lambda x: any([x.endswith(e) for e \
-                            in ['.doc', '.xls']])) if args.filter else None)
+    tester = MacroSampleTester(args.samples, args.dump, args.load, args.save,
+                               not args.quiet,
+                               (lambda x: any([x.endswith(e) for e in \
+                                  ['.doc', '.xls']])) if args.filter else None,
+                               args.vt_key, args.update, args.retry)
     if args.output is not None:
-        Report(tester, "Malicious Macro Detection Report", args.output)
+        r = Report(tester, "Malicious Macro Detection Report", args.output)
+    if args.output == "es" and args.es_send:
+        ElasticSearchClient().load(r.file)

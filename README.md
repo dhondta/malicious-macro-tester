@@ -18,6 +18,7 @@ This tool was tested on an Ubuntu 16.04 with Python 2.7.
 
 It uses the following libraries:
 - `coloredlogs` (because colored logs are better...)
+- `elasticsearch` (required if exporting results to ElasticSearch)
 - `markdown2` (required if using report generation)
 - [`mmbot`](https://github.com/egaus/MaliciousMacroBot) (required for classification)
 - `pandas` (required for parsing MaliciousMacroBot results)
@@ -66,12 +67,13 @@ It uses the following libraries:
 
  ```session
   $ python malicious-macro-tester.py -h
-  usage: malicious-macro-tester [-h] [--api-key VT_KEY]
-                                [--output {html,json,md,pdf,xml}] [-d] [-f] [-l]
-                                [-q] [-r] [-s] [-u] [-v]
+  usage: malicious-macro-tester [-h] [-d] [-f] [-l] [-q] [-r] [-s] [-u]
+                                [--api-key VT_KEY]
+                                [--output {es,html,json,md,pdf,xml}] [--send]
+                                [-v]
                                 FOLDER
 
-  MaliciousMacroTester v2.2
+  MaliciousMacroTester v2.3
   Author: Alexandre D'Hondt
   Reference: INFOM444 - Machine Learning - Hot Topic
 
@@ -85,11 +87,7 @@ It uses the following libraries:
 
   optional arguments:
     -h, --help            show this help message and exit
-    --api-key VT_KEY      VirusTotal API key (default: none)
-                            NB: key as a string or file path to the key
-    --output {html,json,md,pdf,xml}
-                          report file format [html|json|md|pdf|xml] (default: none)
-    -d                    dump complete results (default: false)
+    -d                    dump the VBA macros (default: false)
     -f                    filter only DOC and XLS files (default: false)
     -l                    load previous pickled results (default: false)
     -q                    do not display results report (default: false)
@@ -97,13 +95,23 @@ It uses the following libraries:
                            (default: false)
     -s                    pickle results to a file (default: false)
     -u                    when loading pickle, update VirusTotal results (default: false)
+    --api-key VT_KEY      VirusTotal API key (default: none)
+                            NB: key as a string or file path to the key
+    --output {es,html,json,md,pdf,xml}
+                          report file format (default: none)
+    --send                send the data to ElasticSearch (default: false)
+                            NB: only applies to 'es' format
+                               the configuration is loaded with the following precedence:
+                               1. ./elasticsearch.conf
+                               2. /etc/elasticsearch/elasticsearch.conf
     -v                    debug verbose level (default: false)
 
   Usage examples:
     python malicious-macro-tester.py my_samples_folder
-    python malicious-macro-tester.py samples --api-key virustotal-key.txt -lr
-    python malicious-macro-tester.py samples -lsrv --api-key 098fa24...be724a0
-    python malicious-macro-tester.py samples -lf --output pdf
+    python malicious-macro-tester.py my_samples_folder --api-key virustotal-key.txt -lr
+    python malicious-macro-tester.py my_samples_folder -lsrv --api-key 098fa24...be724a0
+    python malicious-macro-tester.py my_samples_folder -lf --output pdf
+    python malicious-macro-tester.py my_samples_folder --output es --sent
    
  ```
  
@@ -111,8 +119,7 @@ It uses the following libraries:
 
  ```session
   $ python malicious-macro-tester.py samples -vfqs --output xml
-  17:09:05 [DEBUG] Instantiating and initializing MaliciousMacroBot...
-  17:09:09 [WARNING] Macros will be saved to: subsamples/vba
+  17:08:09 [INFO] Instantiating and initializing MaliciousMacroBot...
   17:09:09 [INFO] Processing samples...
   17:09:09 [DEBUG] MMBot: classifying 'file_003.xls'...
   17:09:09 [DEBUG] MMBot: classifying 'file_001.doc'...
@@ -120,7 +127,6 @@ It uses the following libraries:
   17:09:09 [DEBUG] MMBot: classifying 'file_000.doc'...
   17:09:09 [DEBUG] MMBot: classifying 'file_004.xls'...
   17:09:10 [DEBUG] MMBot: classifying 'file_002.doc'...
-  17:09:10 [DEBUG] VT check is disabled
   17:09:10 [INFO] Saving results to pickle...
   17:09:10 [INFO] Parsing results...
   17:09:10 [DEBUG] Generating the JSON report (text only)...
@@ -132,12 +138,8 @@ It uses the following libraries:
 
  ```session
   $ python malicious-macro-tester.py samples -vfql --output pdf
-  17:11:13 [DEBUG] Instantiating and initializing MaliciousMacroBot...
-  17:11:17 [WARNING] Macros will be saved to: subsamples/vba
   17:11:17 [INFO] Loading previous results from pickle...
   17:11:17 [INFO] Processing samples...
-  17:11:17 [DEBUG] Got results from loaded Pickle
-  17:11:17 [DEBUG] VT check is disabled
   17:11:17 [INFO] Parsing results...
   17:11:17 [DEBUG] Generating the Markdown report (text only)...
   17:11:17 [DEBUG] Generating the HTML report (text only)...
@@ -148,19 +150,16 @@ It uses the following libraries:
  
  ```session
   $ python malicious-macro-tester.py subsamples -vfqls --output html --api-key virustotal-key.txt 
-  17:18:18 [DEBUG] Instantiating and initializing MaliciousMacroBot...
-  17:18:22 [WARNING] Macros will be saved to: subsamples/vba
   17:18:22 [INFO] Loading previous results from pickle...
   17:18:22 [DEBUG] Testing VirusTotal API...
   17:18:22 [INFO] Processing samples...
-  17:18:22 [DEBUG] Got results from loaded Pickle
   17:18:22 [DEBUG] > Getting VT information (file_005.xls)...
   17:18:23 [DEBUG] > Getting VT information (file_003.xls)...
   17:18:23 [DEBUG] > Getting VT information (file_004.xls)...
   17:19:23 [DEBUG] > Getting VT information (file_000.doc)...
   17:19:23 [DEBUG] > Getting VT information (file_002.doc)...
   17:19:23 [DEBUG] > Getting VT information (file_001.doc)...
-  17:19:24 [WARNING] VT lookup failed for '45ec78b1cded3f66906857ea14b01049'
+  17:19:24 [WARNING] VT lookup failed for '...'
   17:19:24 [INFO] Saving results to pickle...
   17:19:24 [INFO] Parsing results...
   17:19:24 [DEBUG] Generating the Markdown report (text only)...
@@ -171,17 +170,14 @@ It uses the following libraries:
  
  ```session
   $ python malicious-macro-tester.py subsamples -vfql --output json --api-key virustotal-key.txt 
-  17:21:29 [DEBUG] Instantiating and initializing MaliciousMacroBot...
-  17:21:33 [WARNING] Macros will be saved to: subsamples/vba
   17:21:33 [INFO] Loading previous results from pickle...
   17:21:33 [DEBUG] Testing VirusTotal API...
   17:21:34 [INFO] Processing samples...
-  17:21:34 [DEBUG] Got results from loaded Pickle
   17:21:34 [INFO] Parsing results...
   17:21:34 [DEBUG] Generating the JSON report...
  ```
  
- This will load previous pickled results and generate `report.html`, as shown in the [`examples`](examples) folder.
+ This will load previous pickled results and generate `report.json`, as shown in the [`examples`](examples) folder.
 
 ## Issues management
 
