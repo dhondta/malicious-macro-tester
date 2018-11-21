@@ -589,33 +589,33 @@ if __name__ == '__main__':
                         help="folder with the samples to be tested OR\n"
                              "pickle name if results are loaded with -l")
     parser.add_argument("-d", dest="dump", action="store_true",
-                        help="dump the VBA macros (default: false)")
+                        help="dump the VBA macros")
     parser.add_argument("-f", dest="filter", action="store_true",
-                        help="filter only DOC and XLS files (default: false)")
+                        help="filter only DOC and XLS files")
     parser.add_argument("-l", dest="load", action="store_true",
-                        help="load previous pickled results (default: false)")
+                        help="load previous pickled results")
     parser.add_argument("-q", dest="quiet", action="store_true",
-                        help="do not display results report (default: false)")
+                        help="do not display results report")
     parser.add_argument("-r", dest="retry", action="store_true",
                         help="when loading pickle, retry VirusTotal hashes"
-                             " with None results\n (default: false)")
+                             " with None results\n")
     parser.add_argument("-s", dest="save", action="store_true",
-                        help="pickle results to a file (default: false)")
+                        help="pickle results to a file")
     parser.add_argument("-u", dest="update", action="store_true",
                         help="when loading pickle, update VirusTotal results"
-                             " (default: false)")
+                             "")
     parser.add_argument("--api-key", dest="vt_key", default=None,
-                        help="VirusTotal API key (default: none)\n  NB: "
-                             "key as a string or file path to the key")
+                        help="VirusTotal API key",
+                        note="key as a string or file path to the key")
     parser.add_argument("--output", choices=OUTPUT_FORMATS, default=None,
-                        help="report file format (default: none)")
+                        help="report file format")
     parser.add_argument("--send", action="store_true",
-                        help="send the data to ElasticSearch (default: false)\n"
-                             "  NB: only applies to 'es' format\n     the "
+                        help="send the data to ElasticSearch",
+                        note="only applies to 'es' format\n     the "
                              "configuration is loaded with the following "
                              "precedence:\n     1. ./elasticsearch.conf\n     "
                              "2. /etc/elasticsearch/elasticsearch.conf")
-    initialize(globals())
+    initialize(globals(), noargs_action="wizard")
     # running the main stuff
     tester = MacroSampleTester(args.samples, args.dump, args.load, args.save,
                                not args.quiet,
