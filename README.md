@@ -73,7 +73,7 @@ It uses the following libraries:
                                 [-v]
                                 FOLDER
 
-  MaliciousMacroTester v2.3
+  MaliciousMacroTester v2.4
   Author: Alexandre D'Hondt
   Reference: INFOM444 - Machine Learning - Hot Topic
 
