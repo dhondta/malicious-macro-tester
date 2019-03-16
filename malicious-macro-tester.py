@@ -1,8 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/python3
 # -*- coding: UTF-8 -*-
 
 __author__ = "Alexandre D'Hondt"
-__version__ = "2.3"
+__version__ = "2.4"
 __copyright__ = "AGPLv3 (http://www.gnu.org/licenses/agpl.html)"
 __reference__ = "INFOM444 - Machine Learning - Hot Topic"
 __doc__ = """
@@ -17,15 +17,15 @@ __examples__ = ["my_samples_folder",
                 "my_samples_folder --output es --sent"]
 
 import sys
-if sys.version_info[0] > 2:
-    print("Sorry, this script only works with Python 2...")
+if sys.version_info[0] < 3:
+    print("Sorry, this script only works with Python 3...")
     sys.exit(0)
 # -------------------- IMPORTS SECTION --------------------
 import hashlib
 import json
 import markdown2
 import pickle
-import urllib2
+import urllib.error
 import xmltodict
 from collections import OrderedDict
 from mmbot import MaliciousMacroBot
@@ -537,25 +537,23 @@ class VirusTotalClient(object):
 
     def __init__(self, api_key=None):
         self.__vt = None
+        from virus_total_apis import PublicApi as VT
         try:
-            from virustotal import VirusTotal
             vt_present = True
         except ImportError:
-            logger.warn("'virustotal' module is required to use VirusTotal")
+            logger.warn("'virustotal-api' module is required to use VirusTotal")
             vt_present = False
         if vt_present:
             if api_key is not None:
                 if os.path.isfile(api_key):
                     with open(api_key) as f:
                         api_key = f.read().strip()
-                self.__vt = VirusTotal(api_key)
+                self.__vt = VT(api_key)
                 try:
                     logger.debug("Testing VirusTotal API...")
-                    self.__vt.get(VirusTotalClient.TEST)
-                except urllib2.HTTPError:
-                    logger.warn("Invalid API key ; VirusTotal check disabled")
-                except VirusTotal.ApiError:
-                    logger.warn("API error ; VirusTotal check disabled")
+                    self.__vt.get_file_report(VirusTotalClient.TEST)
+                except:
+                    logger.error("VirusTotal check disabled")
         self.is_enabled = self.__vt is not None
 
     def check(self, h):
@@ -567,19 +565,16 @@ class VirusTotalClient(object):
 
         Failure cases:
         - hash is not known
-        - bad API key
         - network error
         """
         if self.__vt is None:
             return
-        assert any([len(re.findall(r"([a-fA-F\d]{32})", h)) > 0,   # MD5
-                    len(re.findall(r"([a-fA-F\d]{40})", h)) > 0,   # SHA1
-                    len(re.findall(r"([a-fA-F\d]{64})", h)) > 0])  # SHA256
-        from virustotal import VirusTotal
+        assert re.match(r"^([a-fA-F\d]{32}|[a-fA-F\d]{40}|[a-fA-F\d]{64})$", h)
         try:
-            r = self.__vt.get(h)
-            return "{}/{}".format(r.positives, r.total)
-        except (VirusTotal.ApiError, AttributeError):
+            r = self.__vt.get_file_report(h)
+            return "{}/{}".format(r["results"]["positives"],
+                                  r["results"]["total"])
+        except:
             logger.warn("VT lookup failed for '{}'".format(h))
 
 
