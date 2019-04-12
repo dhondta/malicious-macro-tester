@@ -3,7 +3,8 @@
 
 __author__ = "Alexandre D'Hondt"
 __version__ = "2.4"
-__copyright__ = "AGPLv3 (http://www.gnu.org/licenses/agpl.html)"
+__copyright__ = "A. D'Hondt"
+__license__   = "agpl-3.0"
 __reference__ = "INFOM444 - Machine Learning - Hot Topic"
 __doc__ = """
 This tool uses MaliciousMacroBot to classify a list of samples as benign or
