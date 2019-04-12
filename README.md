@@ -1,3 +1,6 @@
+[![Requirements Status](https://requires.io/github/dhondta/malicious-macro-tester/requirements.svg?branch=master)](https://requires.io/github/dhondta/malicious-macro-tester/requirements/?branch=master)
+
+
 ## Table of Contents
 
    * [Introduction](#introduction)
