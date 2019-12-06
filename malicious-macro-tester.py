@@ -611,7 +611,7 @@ if __name__ == '__main__':
                              "configuration is loaded with the following "
                              "precedence:\n     1. ./elasticsearch.conf\n     "
                              "2. /etc/elasticsearch/elasticsearch.conf")
-    initialize(globals(), noargs_action="wizard")
+    initialize(noargs_action="wizard")
     # running the main stuff
     tester = MacroSampleTester(args.samples, args.dump, args.load, args.save,
                                not args.quiet,
