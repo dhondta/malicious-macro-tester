@@ -2,7 +2,7 @@
 # -*- coding: UTF-8 -*-
 
 __author__ = "Alexandre D'Hondt"
-__version__ = "2.4"
+__version__ = "2.4.1"
 __copyright__ = "A. D'Hondt"
 __license__   = "agpl-3.0"
 __reference__ = "INFOM444 - Machine Learning - Hot Topic"
@@ -26,15 +26,12 @@ import hashlib
 import json
 import markdown2
 import pickle
-import urllib.error
 import xmltodict
 from collections import OrderedDict
 from mmbot import MaliciousMacroBot
 from os.path import abspath, exists, isdir, join
-from pandas.core.series import Series
 from subprocess import PIPE, Popen
 from tinyscript import *
-from weasyprint import HTML
 try:
     from elasticsearch import Elasticsearch, helpers
     es_enabled = True
@@ -611,7 +608,7 @@ if __name__ == '__main__':
                              "configuration is loaded with the following "
                              "precedence:\n     1. ./elasticsearch.conf\n     "
                              "2. /etc/elasticsearch/elasticsearch.conf")
-    initialize(globals(), noargs_action="wizard")
+    initialize(noargs_action="wizard")
     # running the main stuff
     tester = MacroSampleTester(args.samples, args.dump, args.load, args.save,
                                not args.quiet,
