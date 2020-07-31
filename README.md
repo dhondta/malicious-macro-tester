@@ -2,15 +2,6 @@
 [![Known Vulnerabilities](https://snyk.io/test/github/dhondta/malicious-macro-tester/badge.svg?targetFile=requirements.txt)](https://snyk.io/test/github/dhondta/malicious-macro-tester?targetFile=requirements.txt)
 
 
-## Table of Contents
-
-   * [Introduction](#introduction)
-   * [System Requirements](#system-requirements)
-   * [Installation](#installation)
-   * [Quick Start](#quick-start)
-   * [Issues management](#issues-management)
-
-
 ## Introduction
 
 This CLI tool automates the classification of Office documents with macros using MaliciousMacroBot. It allows to analyze a folder of sample files and to generate a report in multiple output formats.
@@ -70,53 +61,58 @@ It uses the following libraries:
 1. Help
 
  ```session
-  $ python malicious-macro-tester.py -h
-  usage: malicious-macro-tester [-h] [-d] [-f] [-l] [-q] [-r] [-s] [-u]
-                                [--api-key VT_KEY]
-                                [--output {es,html,json,md,pdf,xml}] [--send]
-                                [-v]
-                                FOLDER
-
-  MaliciousMacroTester v2.4
-  Author: Alexandre D'Hondt
+  $ python malicious-macro-tester.py --help
+  MaliciousMacroTester 2.4.2
+  Author   : Alexandre D'Hondt
+  Copyright: © 2020 A. D'Hondt
+  License  : GNU Affero General Public License v3.0
   Reference: INFOM444 - Machine Learning - Hot Topic
-
-  This tool uses MaliciousMacroBot to classify a list of samples as benign or
-   malicious and provides a report. Note that it only works on an input folder
-   and list every file to run it against mmbot.
-
+  
+  This tool uses MaliciousMacroBot to classify a list of samples as benign or malicious and provides a report. Note that
+   it only works on an input folder and list every file to run it against mmbot.
+  
+  usage: ./malicious-macro-tester.py [-d] [-f] [-l] [-q] [-r] [-s] [-u]
+                                     [--api-key VT_KEY]
+                                     [--output {es,html,json,md,pdf,xml}]
+                                     [--send] [-h] [--help] [-v]
+                                     FOLDER
+  
   positional arguments:
-    FOLDER                folder with the samples to be tested OR
-                          pickle name if results are loaded with -l
-
+    FOLDER  folder with the samples to be tested OR
+            pickle name if results are loaded with -l
+  
   optional arguments:
-    -h, --help            show this help message and exit
-    -d                    dump the VBA macros (default: false)
-    -f                    filter only DOC and XLS files (default: false)
-    -l                    load previous pickled results (default: false)
-    -q                    do not display results report (default: false)
+    -d                    dump the VBA macros (default: False)
+    -f                    filter only DOC and XLS files (default: False)
+    -l                    load previous pickled results (default: False)
+    -q                    do not display results report (default: False)
     -r                    when loading pickle, retry VirusTotal hashes with None results
-                           (default: false)
-    -s                    pickle results to a file (default: false)
-    -u                    when loading pickle, update VirusTotal results (default: false)
-    --api-key VT_KEY      VirusTotal API key (default: none)
-                            NB: key as a string or file path to the key
+                           (default: False)
+    -s                    pickle results to a file (default: False)
+    -u                    when loading pickle, update VirusTotal results (default: False)
+    --api-key VT_KEY      VirusTotal API key (default: None)
+                           NB: key as a string or file path to the key
     --output {es,html,json,md,pdf,xml}
-                          report file format (default: none)
-    --send                send the data to ElasticSearch (default: false)
-                            NB: only applies to 'es' format
+                          report file format (default: None)
+    --send                send the data to ElasticSearch (default: False)
+                           NB: only applies to 'es' format
                                the configuration is loaded with the following precedence:
+  
                                1. ./elasticsearch.conf
                                2. /etc/elasticsearch/elasticsearch.conf
-    -v                    debug verbose level (default: false)
-
+  
+  extra arguments:
+    -h             show usage message and exit
+    --help         show this help message and exit
+    -v, --verbose  verbose mode (default: False)
+  
   Usage examples:
-    python malicious-macro-tester.py my_samples_folder
-    python malicious-macro-tester.py my_samples_folder --api-key virustotal-key.txt -lr
-    python malicious-macro-tester.py my_samples_folder -lsrv --api-key 098fa24...be724a0
-    python malicious-macro-tester.py my_samples_folder -lf --output pdf
-    python malicious-macro-tester.py my_samples_folder --output es --sent
-   
+    ./malicious-macro-tester.py my_samples_folder
+    ./malicious-macro-tester.py my_samples_folder --api-key virustotal-key.txt -lr
+    ./malicious-macro-tester.py my_samples_folder -lsrv --api-key 098fa24...be724a0
+    ./malicious-macro-tester.py my_samples_folder -lf --output pdf
+    ./malicious-macro-tester.py my_samples_folder --output es --sent
+  
  ```
  
 2. Examples of output
