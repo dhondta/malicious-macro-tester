@@ -1,7 +1,4 @@
-coloredlogs
 elasticsearch
 markdown2
 mmbot
-tinyscript
-weasyprint
-xmltodict
+tinyscript>=1.22.11
