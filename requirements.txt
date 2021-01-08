@@ -1,4 +1,4 @@
 elasticsearch
-markdown2
+markdown2>=2.3.9
 mmbot
-tinyscript>=1.22.11
+tinyscript>=1.23.15
