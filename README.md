@@ -4,7 +4,7 @@
 
 ## Introduction
 
-This CLI tool automates the classification of Office documents with macros using MaliciousMacroBot. It allows to analyze a folder of sample files and to generate a report in multiple output formats.
+This CLI tool automates the classification of Office documents with macros using [MaliciousMacroBot](https://github.com/egaus/MaliciousMacroBot). It allows to analyze a folder of sample files and to generate a report in multiple output formats.
 
 
 ## System Requirements
@@ -17,7 +17,7 @@ It uses the following libraries:
 - `markdown2` (required if using report generation)
 - [`mmbot`](https://github.com/egaus/MaliciousMacroBot) (required for classification)
 - `pandas` (required for parsing MaliciousMacroBot results)
-- `tinyscript` (required)
+- [`tinyscript`](https://github.com/dhondta/python-tinyscript) (required)
 - `weasyprint` (required if using PDF report format)
 - `xmltodict` (required if using XML report format)
 
