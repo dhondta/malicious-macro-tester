@@ -9,7 +9,7 @@ use-site-title: false
 
 ## Introduction
 
-This CLI tool automates the classification of Office documents with macros using MaliciousMacroBot. It allows to analyze a folder of sample files and to generate a report in multiple output formats.
+This CLI tool automates the classification of Office documents with macros using [MaliciousMacroBot](https://github.com/egaus/MaliciousMacroBot). It allows to analyze a folder of sample files and to generate a report in multiple output formats.
 
 
 ## System Requirements
