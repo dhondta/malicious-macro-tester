@@ -1,4 +1,3 @@
-[![Requirements Status](https://requires.io/github/dhondta/malicious-macro-tester/requirements.svg?branch=master)](https://requires.io/github/dhondta/malicious-macro-tester/requirements/?branch=master)
 [![Known Vulnerabilities](https://snyk.io/test/github/dhondta/malicious-macro-tester/badge.svg?targetFile=requirements.txt)](https://snyk.io/test/github/dhondta/malicious-macro-tester?targetFile=requirements.txt)
 
 
